@@ -1,0 +1,748 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. AUTH & SYSTEM CONFIG
+// ==========================================
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model AiUsage {
+  id            String   @id @default(uuid())
+  provider      String // GEMINI
+  model         String // gemini-3.8-flash
+  taskType      String // PRODUCT_ANALYSIS, CREATIVE_GENERATION, CLAIM_GUARD, etc.
+  inputTokens   Int      @default(0)
+  outputTokens  Int      @default(0)
+  estimatedCost Decimal  @default(0.0) @db.Decimal(10, 4)
+  success       Boolean  @default(true)
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  @@index([taskType, createdAt])
+  @@map("ai_usage")
+}
+
+// ==========================================
+// 2. TIKTOK ACCOUNT & STAGE MANAGEMENT
+// ==========================================
+
+enum AccountStage {
+  NEW // 0 - 300 followers
+  GROWING // 300 - 700 followers
+  PRE_AFFILIATE // 700 - 1000 followers
+  AFFILIATE_ACTIVE // Đã mở giỏ hàng affiliate
+  SCALING // Đã có doanh số lặp lại
+}
+
+model TikTokAccount {
+  id             String                  @id @default(uuid())
+  username       String                  @unique
+  displayName    String
+  avatarUrl      String?
+  openId         String                  @unique
+  unionId        String?
+  stage          AccountStage            @default(NEW)
+  isActive       Boolean                 @default(true)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  oauthTokens    TikTokOAuthToken?
+  snapshots      TikTokAccountSnapshot[]
+  stageHistories AccountStageHistory[]
+  publications   Publication[]
+
+  @@map("tiktok_accounts")
+}
+
+model TikTokOAuthToken {
+  id                    String        @id @default(uuid())
+  accountId             String        @unique
+  account               TikTokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  encryptedAccessToken  String
+  encryptedRefreshToken String
+  scope                 String
+  expiresAt             DateTime
+  refreshExpiresAt      DateTime
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@map("tiktok_oauth_tokens")
+}
+
+model TikTokAccountSnapshot {
+  id             String        @id @default(uuid())
+  accountId      String
+  account        TikTokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  followerCount  Int
+  followingCount Int
+  likesCount     Int
+  videoCount     Int
+  capturedAt     DateTime      @default(now())
+
+  @@index([accountId, capturedAt])
+  @@map("account_snapshots")
+}
+
+model AccountStageHistory {
+  id         String        @id @default(uuid())
+  accountId  String
+  account    TikTokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  fromStage  AccountStage
+  toStage    AccountStage
+  reason     String
+  approvedBy String // "OWNER"
+  changedAt  DateTime      @default(now())
+
+  @@index([accountId, changedAt])
+  @@map("account_stage_history")
+}
+
+// ==========================================
+// 3. VIRTUAL CREATORS (LINH & NAM)
+// ==========================================
+
+enum Gender {
+  FEMALE
+  MALE
+}
+
+enum ReferenceImageType {
+  MASTER_FACE
+  FRONT
+  THREE_QUARTER
+  SIDE
+  FULL_BODY
+  SITTING
+  STANDING
+  HOLDING_OBJECT
+  EXPRESSION
+  OUTFIT
+}
+
+model VirtualCreator {
+  id                     String                  @id @default(uuid())
+  name                   String                  @unique // "LINH", "NAM"
+  gender                 Gender
+  ageStyle               String // "23-26", "25-29"
+  description            String                  @db.Text
+  masterAppearancePrompt String                  @db.Text
+  negativePrompt         String                  @db.Text
+  active                 Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  referenceImages        CreatorReferenceImage[]
+  voiceProfiles          CreatorVoiceProfile[]
+  creatives              Creative[]
+  contentPlanItems       ContentPlanItem[]
+
+  @@map("virtual_creators")
+}
+
+model CreatorReferenceImage {
+  id        String             @id @default(uuid())
+  creatorId String
+  creator   VirtualCreator     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  type      ReferenceImageType
+  localPath String
+  approved  Boolean            @default(true)
+  version   Int                @default(1)
+  createdAt DateTime           @default(now())
+
+  @@index([creatorId, type])
+  @@map("creator_reference_images")
+}
+
+model CreatorVoiceProfile {
+  id              String         @id @default(uuid())
+  creatorId       String
+  creator         VirtualCreator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  provider        String // "MACOS_SAY", "LOCAL_EDGE_TTS"
+  providerVoiceId String // e.g. "Linh", "vi-VN-HoaiMyNeural"
+  tone            String // "friendly, natural, modern"
+  speakingRate    Float          @default(1.0)
+  energy          Float          @default(1.0)
+  notes           String?
+  isDefault       Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+
+  @@map("creator_voice_profiles")
+}
+
+// ==========================================
+// 4. PRODUCTS & CANDIDATES
+// ==========================================
+
+enum ProductStatus {
+  CANDIDATE
+  TESTING
+  WINNER
+  PAUSED
+  REJECTED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Product {
+  id               String                @id @default(uuid())
+  name             String
+  category         String
+  url              String?
+  price            Decimal?              @db.Decimal(10, 2)
+  commissionRate   Decimal?              @db.Decimal(5, 2)
+  description      String                @db.Text
+  features         String[]              @default([])
+  verifiedClaims   String[]              @default([])
+  sellerInfo       String?
+  status           ProductStatus         @default(CANDIDATE)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  images           ProductImage[]
+  analyses         ProductAnalysis[]
+  score            ProductScore?
+  scoreHistories   ProductScoreHistory[]
+  creatives        Creative[]
+  contentPlanItems ContentPlanItem[]
+  candidateRecord  ProductCandidate?
+
+  @@index([category, status])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  localPath String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductAnalysis {
+  id                       String    @id @default(uuid())
+  productId                String
+  product                  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  version                  Int       @default(1)
+  targetAudience           String[]
+  painPoints               String[]
+  purchaseMotivations      String[]
+  keyFeatures              String[]
+  safeClaims               String[]
+  riskClaims               String[]
+  recommendedCreator       String // "LINH" | "NAM" | "BOTH"
+  recommendedContentAngles String[]
+  visualDemonstrability    Int // 1 - 10
+  accountFit               Int // 1 - 10
+  riskLevel                RiskLevel
+  rawAiResponse            Json
+  createdAt                DateTime  @default(now())
+
+  @@index([productId, version])
+  @@map("product_analyses")
+}
+
+model ProductScore {
+  id              String   @id @default(uuid())
+  productId       String   @unique
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  visualScore     Float
+  accountFitScore Float
+  trendScore      Float
+  commercialScore Float
+  overallScore    Float
+  updatedAt       DateTime @updatedAt
+
+  @@map("product_scores")
+}
+
+model ProductScoreHistory {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  overallScore Float
+  factors      Json
+  recordedAt   DateTime @default(now())
+
+  @@index([productId, recordedAt])
+  @@map("product_score_history")
+}
+
+model ProductCandidate {
+  id             String    @id @default(uuid())
+  productId      String    @unique
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priorityOrder  Int       @default(0)
+  shortlistedAt  DateTime  @default(now())
+  reviewedAt     DateTime?
+  reviewerAction String? // "APPROVED" | "REJECTED" | "PAUSED"
+
+  @@map("product_candidates")
+}
+
+// ==========================================
+// 5. CAMPAIGNS, CREATIVES & CLAIM GUARD
+// ==========================================
+
+enum ContentIntent {
+  DISCOVERY
+  EDUCATION
+  ENTERTAINMENT
+  SOFT_SELL
+  HARD_SELL
+}
+
+enum ClaimGuardStatus {
+  PASS
+  WARNING
+  BLOCK
+}
+
+enum CreativeStatus {
+  DRAFT
+  CONCEPT_APPROVED
+  PROMPT_READY
+  IMAGE_UPLOADED
+  VIDEO_UPLOADED
+  VOICE_GENERATED
+  FINAL_RENDERED
+  READY_TO_POST
+  PUBLISHED
+}
+
+model Campaign {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  startDate   DateTime   @default(now())
+  endDate     DateTime?
+  isActive    Boolean    @default(true)
+  creatives   Creative[]
+
+  @@map("campaigns")
+}
+
+model Creative {
+  id               String           @id @default(uuid())
+  campaignId       String?
+  campaign         Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  productId        String
+  product          Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  creatorId        String
+  creator          VirtualCreator   @relation(fields: [creatorId], references: [id])
+  hook             String
+  hookType         String // PROBLEM_FIRST, CURIOSITY, BEFORE_AFTER...
+  angle            String
+  durationSec      Int              @default(12)
+  caption          String           @db.Text
+  hashtags         String[]         @default([])
+  cta              String
+  contentIntent    ContentIntent    @default(DISCOVERY)
+  claimGuardStatus ClaimGuardStatus @default(PASS)
+  claimGuardReport Json?
+  status           CreativeStatus   @default(DRAFT)
+  currentVersion   Int              @default(1)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  timelines          CreativeTimeline[]
+  versions           CreativeVersion[]
+  prompts            Prompt[]
+  assets             Asset[]
+  contentPlanItems   ContentPlanItem[]
+  publication        Publication?
+  experimentVariants ExperimentVariant[]
+
+  @@index([productId, creatorId, status])
+  @@map("creatives")
+}
+
+model CreativeTimeline {
+  id          String   @id @default(uuid())
+  creativeId  String
+  creative    Creative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  startSec    Float
+  endSec      Float
+  visualDesc  String   @db.Text
+  voiceText   String   @db.Text
+  overlayText String?
+  orderIndex  Int
+
+  @@index([creativeId, orderIndex])
+  @@map("creative_timelines")
+}
+
+model CreativeVersion {
+  id         String   @id @default(uuid())
+  creativeId String
+  creative   Creative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  version    Int
+  snapshot   Json
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@unique([creativeId, version])
+  @@map("creative_versions")
+}
+
+// ==========================================
+// 6. PROMPTS & ASSETS (VERSIONED)
+// ==========================================
+
+enum PromptType {
+  IMAGE_MODEL_PRODUCT
+  IMAGE_THUMBNAIL
+  VIDEO_VEO_GEMINI
+}
+
+model Prompt {
+  id         String          @id @default(uuid())
+  creativeId String
+  creative   Creative        @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  type       PromptType
+  content    String          @db.Text
+  version    Int             @default(1)
+  createdAt  DateTime        @default(now())
+  versions   PromptVersion[]
+
+  @@index([creativeId, type])
+  @@map("prompts")
+}
+
+model PromptVersion {
+  id        String   @id @default(uuid())
+  promptId  String
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  version   Int
+  createdAt DateTime @default(now())
+
+  @@unique([promptId, version])
+  @@map("prompt_versions")
+}
+
+enum AssetType {
+  GENERATED_IMAGE
+  THUMBNAIL
+  RAW_VIDEO
+  VOICE_AUDIO
+  FINAL_VIDEO
+}
+
+model Asset {
+  id         String         @id @default(uuid())
+  creativeId String
+  creative   Creative       @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  type       AssetType
+  localPath  String
+  mimeType   String
+  fileSize   Int
+  metadata   Json? // Resolution, duration, bitrate
+  version    Int            @default(1)
+  createdAt  DateTime       @default(now())
+  versions   AssetVersion[]
+
+  @@index([creativeId, type])
+  @@map("assets")
+}
+
+model AssetVersion {
+  id        String   @id @default(uuid())
+  assetId   String
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  localPath String
+  version   Int
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@unique([assetId, version])
+  @@map("asset_versions")
+}
+
+// ==========================================
+// 7. CONTENT CALENDAR & PLANNING
+// ==========================================
+
+enum ContentPlanStatus {
+  PROPOSED
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model ContentPlan {
+  id              String            @id @default(uuid())
+  date            DateTime          @db.Date
+  accountStage    AccountStage
+  strategyVersion Int               @default(1)
+  status          ContentPlanStatus @default(PROPOSED)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  items           ContentPlanItem[]
+
+  @@unique([date])
+  @@map("content_plans")
+}
+
+enum PlanItemStatus {
+  PROPOSED
+  APPROVED
+  IMAGE_PENDING
+  VIDEO_PENDING
+  POST_PROCESSING
+  READY
+  DRAFT_UPLOADED
+  PUBLISHED
+  ANALYZING
+}
+
+model ContentPlanItem {
+  id           String         @id @default(uuid())
+  planId       String
+  plan         ContentPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  plannedAt    DateTime
+  creatorId    String
+  creator      VirtualCreator @relation(fields: [creatorId], references: [id])
+  productId    String
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  creativeId   String?
+  creative     Creative?      @relation(fields: [creativeId], references: [id], onDelete: SetNull)
+  category     String
+  hook         String
+  angle        String
+  objective    String
+  experimentId String?
+  experiment   Experiment?    @relation(fields: [experimentId], references: [id], onDelete: SetNull)
+  status       PlanItemStatus @default(PROPOSED)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([planId, plannedAt, status])
+  @@map("content_plan_items")
+}
+
+// ==========================================
+// 8. PUBLICATIONS & ANALYTICS
+// ==========================================
+
+model Publication {
+  id             String        @id @default(uuid())
+  accountId      String
+  account        TikTokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  creativeId     String        @unique
+  creative       Creative      @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  tikTokVideoId  String?       @unique
+  tikTokShareUrl String?
+  postedAt       DateTime      @default(now())
+
+  dna                PublicationCreativeDNA?
+  metricSnapshots    VideoMetricSnapshot[]
+  affiliateSnapshots AffiliateMetricSnapshot[]
+
+  @@index([accountId, postedAt])
+  @@map("publications")
+}
+
+model PublicationCreativeDNA {
+  id            String      @id @default(uuid())
+  publicationId String      @unique
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  creatorId     String
+  productId     String
+  category      String
+  hookType      String
+  hookText      String
+  angle         String
+  durationSec   Int
+  voiceProfile  String
+  ctaType       String
+  captionStyle  String
+  hashtagGroup  String[]    @default([])
+  postedSlot    String // "12:00", "20:00"
+
+  @@index([creatorId, category, hookType])
+  @@map("publication_creative_dna")
+}
+
+model VideoMetricSnapshot {
+  id             String      @id @default(uuid())
+  publicationId  String
+  publication    Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  views          Int         @default(0)
+  likes          Int         @default(0)
+  comments       Int         @default(0)
+  shares         Int         @default(0)
+  likeRate       Float       @default(0.0)
+  commentRate    Float       @default(0.0)
+  shareRate      Float       @default(0.0)
+  engagementRate Float       @default(0.0)
+  viewVelocity   Float       @default(0.0)
+  capturedAt     DateTime    @default(now())
+
+  @@index([publicationId, capturedAt])
+  @@map("video_metric_snapshots")
+}
+
+model AffiliateMetricSnapshot {
+  id              String      @id @default(uuid())
+  publicationId   String
+  publication     Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  productClicks   Int         @default(0)
+  orders          Int         @default(0)
+  confirmedOrders Int         @default(0)
+  gmv             Decimal     @default(0.0) @db.Decimal(12, 2)
+  commission      Decimal     @default(0.0) @db.Decimal(12, 2)
+  conversionRate  Float       @default(0.0)
+  capturedAt      DateTime    @default(now())
+
+  @@index([publicationId, capturedAt])
+  @@map("affiliate_metric_snapshots")
+}
+
+// ==========================================
+// 9. EXPERIMENTS & KNOWLEDGE
+// ==========================================
+
+enum ExperimentStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CONCLUDED
+}
+
+model Experiment {
+  id            String              @id @default(uuid())
+  question      String
+  hypothesis    String              @db.Text
+  primaryMetric String // "views", "engagement", "orders"
+  status        ExperimentStatus    @default(DRAFT)
+  startDate     DateTime?
+  endDate       DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  variants      ExperimentVariant[]
+  result        ExperimentResult?
+  planItems     ContentPlanItem[]
+
+  @@map("experiments")
+}
+
+model ExperimentVariant {
+  id           String     @id @default(uuid())
+  experimentId String
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  creativeId   String
+  creative     Creative   @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  variantName  String // "Variant A (8s)", "Variant B (12s)"
+  params       Json
+
+  @@map("experiment_variants")
+}
+
+model ExperimentResult {
+  id             String     @id @default(uuid())
+  experimentId   String     @unique
+  experiment     Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  sampleSize     Int
+  metrics        Json
+  resultSummary  String     @db.Text
+  confidence     Float
+  recommendation String     @db.Text
+  recordedAt     DateTime   @default(now())
+
+  @@map("experiment_results")
+}
+
+enum KnowledgeStatus {
+  CANDIDATE
+  ACTIVE
+  WEAKENING
+  RETIRED
+}
+
+model KnowledgeRule {
+  id                    String          @id @default(uuid())
+  title                 String
+  statement             String          @db.Text
+  evidenceCount         Int             @default(1)
+  supportingCreativeIds String[]        @default([])
+  confidence            Float           @default(0.5)
+  status                KnowledgeStatus @default(CANDIDATE)
+  createdAt             DateTime        @default(now())
+  lastValidatedAt       DateTime        @default(now())
+
+  @@map("knowledge_rules")
+}
+
+// ==========================================
+// 10. DAILY REPORTS & STRATEGY
+// ==========================================
+
+model DailyReport {
+  id                     String             @id @default(uuid())
+  reportDate             DateTime           @unique @db.Date
+  observations           String[]           @default([])
+  hypotheses             String[]           @default([])
+  creatorInsights        Json
+  categoryInsights       Json
+  hookInsights           Json
+  postingTimeInsights    Json
+  productsToScale        String[]           @default([])
+  productsToPause        String[]           @default([])
+  recommendedExperiments Json
+  tomorrowAllocation     Json // {"exploit": 0.7, "adjacent": 0.2, "explore": 0.1}
+  rawAiReport            Json
+  createdAt              DateTime           @default(now())
+  decisions              StrategyDecision[]
+
+  @@map("daily_reports")
+}
+
+model StrategyDecision {
+  id            String       @id @default(uuid())
+  dailyReportId String?
+  dailyReport   DailyReport? @relation(fields: [dailyReportId], references: [id], onDelete: SetNull)
+  decisionType  String // "SCALE_CATEGORY", "PAUSE_PRODUCT", "NEW_RULE"
+  rationale     String       @db.Text
+  actionTaken   String       @db.Text
+  implemented   Boolean      @default(false)
+  version       Int          @default(1)
+  createdAt     DateTime     @default(now())
+
+  @@map("strategy_decisions")
+}

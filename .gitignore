@@ -1,0 +1,49 @@
+# dependencies
+/node_modules
+/.pnpm-store
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# testing
+/coverage
+
+# media uploaded files (keep structure via .gitkeep)
+media/creators/*/*
+!media/creators/*/.gitkeep
+media/products/*
+!media/products/.gitkeep
+media/generated/*
+!media/generated/.gitkeep
+media/raw/*
+!media/raw/.gitkeep
+media/voices/*
+!media/voices/.gitkeep
+media/subtitles/*
+!media/subtitles/.gitkeep
+media/finals/*
+!media/finals/.gitkeep
+media/thumbnails/*
+!media/thumbnails/.gitkeep

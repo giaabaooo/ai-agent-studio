@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { geminiProvider } from "@/providers/ai/gemini.provider";
 import { evaluateClaimGuard } from "./claim-guard";
-import { CreativeStatus, PromptType } from "@prisma/client";
+import { CreativeStatus, PromptType, ProductStatus } from "@prisma/client";
 
 export class CreativeService {
   async getCreatives(filter?: { creatorId?: string; productId?: string; status?: CreativeStatus }) {
@@ -44,6 +44,7 @@ export class CreativeService {
         },
         assets: {
           include: { versions: { orderBy: { version: "desc" } } },
+          orderBy: { createdAt: "desc" },
         },
         versions: {
           orderBy: { version: "desc" },
@@ -107,17 +108,28 @@ export class CreativeService {
 
       // Generate Image Prompt for ChatGPT
       const chatGptImagePrompt = `
-TikTok UGC portrait photo of Vietnamese creator ${creator.name} (${creator.ageStyle} years old).
+Clean original vertical social-media UGC source photo of Vietnamese creator ${creator.name} (${creator.ageStyle} years old).
 Creator identity appearance: ${creator.masterAppearancePrompt}
 Creator is holding and demonstrating the actual product: "${product.name}".
 Product description & features: ${product.description}.
 Action: Creator naturally testing the product in a real home setting, realistic natural lighting, realistic hands, authentic smartphone camera quality, 9:16 vertical aspect ratio.
-Negative prompt: ${creator.negativePrompt}
+The source image must be clean and original: no watermark, no TikTok logo, no username or handle, no caption, no social-media UI, no text overlay, no stickers, no brand logo.
+Negative prompt: ${creator.negativePrompt}, watermark, TikTok logo, username, handle, caption, social-media interface, text overlay, sticker, brand logo.
 `.trim();
 
       // Generate Video Prompt for Gemini/Veo
+      const spokenLines = concept.timeline
+        .map(
+          (item) =>
+            `- ${item.start} to ${item.end}s: Speak exactly in Vietnamese: "${item.voice}"`
+        )
+        .join("\n");
+      const voiceDescription =
+        creator.gender === "FEMALE"
+          ? "a warm, natural Vietnamese female voice"
+          : "a warm, natural Vietnamese male voice";
       const veoVideoPrompt = `
-TikTok UGC 10-12s vertical video, 9:16 aspect ratio.
+Clean original vertical social-media UGC source footage, 10-12 seconds, 9:16 aspect ratio. Do not imitate or reproduce an existing TikTok video.
 Model: Vietnamese creator ${creator.name}, natural facial features, consistent character identity.
 Setting: Casual modern realistic indoor environment.
 Scene breakdown:
@@ -125,7 +137,12 @@ Scene breakdown:
 - 2 to 7s: ${concept.timeline[1]?.visual || "Hands naturally demonstrating product in action"}
 - 7 to 10s: ${concept.timeline[2]?.visual || "Clear satisfied reaction and visible product result"}
 - 10 to 12s: ${concept.timeline[3]?.visual || "Creator holding product smiling naturally"}
-Crucial constraints: Keep product dimensions exact. Realistic natural hands with exactly 5 fingers. No logo morphing, no text renders, no background warping.
+
+Native audio: Generate synchronized spoken dialogue in ${voiceDescription}; natural conversational delivery, clean Vietnamese pronunciation, and realistic room tone. Speak the following lines at their exact timestamps:
+${spokenLines}
+No background music louder than the voice. Do not add any other speech, English speech, narration, captions, or sound effects that obscure the dialogue.
+
+Crucial constraints: Keep product dimensions exact. Realistic natural hands with exactly 5 fingers. No logo morphing, no text renders, no background warping. Absolutely no watermark, TikTok logo, username, handle, caption, social-media UI, sticker, brand logo, or any text anywhere in the frame.
 `.trim();
 
       const creative = await prisma.creative.create({
@@ -194,6 +211,14 @@ Crucial constraints: Keep product dimensions exact. Realistic natural hands with
       });
 
       createdCreatives.push(creative);
+    }
+
+    // Auto transition product to TESTING if it is currently CANDIDATE
+    if (product.status === ProductStatus.CANDIDATE) {
+      await prisma.product.update({
+        where: { id: productId },
+        data: { status: ProductStatus.TESTING },
+      });
     }
 
     return createdCreatives;

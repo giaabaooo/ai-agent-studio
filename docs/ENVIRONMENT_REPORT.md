@@ -1,4 +1,4 @@
-# BÁO CÁO MÔI TRƯỜNG PREFLIGHT (ENVIRONMENT REPORT)
+# BÁO CÁO MÔI TRƯỜNG & MEDIA PIPELINE
 
 **Dự án:** Affiliate AI Studio (Local-First on macOS)  
 **Thời gian kiểm tra:** 2026-10-01  
@@ -38,7 +38,7 @@
 - **Binary:** `/Users/na/.local/bin/ffmpeg`
 - **Kiến trúc:** arm64
 - **Tính năng codec:** H.264 (`libx264`), AAC, MP3 (`libmp3lame`), Opus, Subtitles/Captions (`libass`), FreeType font rendering.
-- **Trạng thái:** Sẵn sàng cho Phase 2 renderer.
+- **Trạng thái:** Đã được dùng bởi Phase 2 renderer. App dùng `FFMPEG_PATH=ffmpeg` mặc định để chạy theo PATH; đường dẫn tuyệt đối, nếu cần, chỉ đặt trong `.env.local` của từng máy.
 
 ---
 
@@ -60,3 +60,26 @@ media/
 ```
 
 Mọi dữ liệu media chỉ lưu trên disk local, không lưu binary vào PostgreSQL.
+
+## 5. Portable Mac / Windows
+
+- Database chỉ lưu storage key tương đối, ví dụ `raw/video-001.mp4`; không lưu đường dẫn tuyệt đối của Mac hay Windows.
+- `MACHINE_LABEL` mô tả máy đã tạo/lưu asset (`MAC_OFFICE`, `WINDOWS_HOME`...).
+- macOS dùng `VOICE_PROVIDER=MACOS_SAY`; Windows dùng `VOICE_PROVIDER=EXTERNAL` và import file audio đã tạo.
+- Thư mục media không được commit vào Git. Code và migration đồng bộ qua Git; media lớn tiếp tục ở Windows theo workflow đã chốt.
+
+---
+
+## 6. Cấu hình Phase 3 — TikTok Connect & Publishing Prep
+
+- **PostgreSQL Migrations:**
+  - `20261001103649_init`: Phase 1 core schema.
+  - `20261001104618_phase2_media_pipeline`: Phase 2 media assets, versioning, machineLabel.
+  - `20261002013545_phase_3_tiktok_connect`: Phase 3 TikTok OAuth Sessions và Publication publishId.
+- **Biến môi trường mới:**
+  - `TIKTOK_CLIENT_KEY`: Client Key từ TikTok for Developers Portal.
+  - `TIKTOK_CLIENT_SECRET`: Client Secret từ TikTok for Developers Portal.
+  - `TIKTOK_REDIRECT_URI`: Endpoint callback (mặc định: `http://localhost:3000/api/tiktok/callback`).
+  - `TIKTOK_DRAFT_UPLOAD_ENABLED`: Cờ tính năng upload draft vào hộp thư TikTok Inbox (`false` theo mặc định an toàn).
+- **Mã hóa Token:** AES-256-GCM với `TOKEN_ENCRYPTION_KEY` 256-bit, lưu token vào `tiktok_oauth_tokens`.
+- **Test Suite Status:** 9 test files, 31 tests passed (100% pass với mock sandbox khi không có credentials thật).

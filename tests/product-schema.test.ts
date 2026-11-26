@@ -15,7 +15,7 @@ describe("Product Schema Validation", () => {
       description: "Máy hút bụi nhỏ gọn cầm tay cho xe hơi và bàn làm việc.",
       features: ["Lực hút 9000Pa", "Pin 30 phút"],
       verifiedClaims: ["Hút sạch bụi mịn"],
-      imageUrls: ["media/products/img1.jpg", "media/products/img2.jpg"],
+      imageUrls: ["products/img1.jpg", "products/img2.jpg", "products/img3.jpg"],
     };
 
     const parsed = createProductSchema.safeParse(validData);
@@ -27,7 +27,7 @@ describe("Product Schema Validation", () => {
       name: "A",
       category: "Tech",
       description: "Mô tả sản phẩm rất dài và chi tiết.",
-      imageUrls: ["media/products/img1.jpg"],
+      imageUrls: ["products/img1.jpg", "products/img2.jpg", "products/img3.jpg"],
     };
 
     const parsed = createProductSchema.safeParse(invalidData);

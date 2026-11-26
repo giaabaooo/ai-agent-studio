@@ -12,7 +12,7 @@ export const createProductSchema = z.object({
   sellerInfo: z.string().optional().or(z.literal("")),
   imageUrls: z
     .array(z.string())
-    .min(1, "Cần tối thiểu 1 ảnh sản phẩm")
+    .min(3, "Cần tối thiểu 3 ảnh sản phẩm")
     .max(8, "Tối đa 8 ảnh sản phẩm"),
 });
 

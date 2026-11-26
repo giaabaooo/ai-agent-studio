@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { productService } from "@/modules/products/product.service";
 import { ProductStatus } from "@prisma/client";
+import { createProductSchema } from "@/lib/schemas/product.schema";
 
 export async function GET(
   req: NextRequest,
@@ -28,14 +29,16 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const { status } = await req.json();
-    if (!status) {
-      return NextResponse.json({ error: "Thiếu status" }, { status: 400 });
+    const body = await req.json();
+    if (body.status) {
+      const updated = await productService.updateProductStatus(
+        id,
+        body.status as ProductStatus
+      );
+      return NextResponse.json({ success: true, product: updated });
     }
-    const updated = await productService.updateProductStatus(
-      id,
-      status as ProductStatus
-    );
+    const validated = createProductSchema.parse(body);
+    const updated = await productService.updateProduct(id, validated);
     return NextResponse.json({ success: true, product: updated });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Cập nhật sản phẩm thất bại";

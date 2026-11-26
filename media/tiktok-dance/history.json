@@ -1,0 +1,37 @@
+[
+  {
+    "id": "dance_1795482393425",
+    "jobId": "01a20b11-0ba8-7ea2-9ac9-3817c3391c58",
+    "videoUrl": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795482411/tiktok-video/tiktok_dance/dance_1795482393425.mp4",
+    "localPath": "tiktok-dance/outputs/dance_final_1795482393425.mp4",
+    "storageProvider": "CLOUDINARY",
+    "characterImage": "/api/media/file/https://res.cloudinary.com/dcadn2syh/image/upload/v1795481973/tiktok-video/uploads/characters/1795452473527_3607547107122021069_3607547107122021069_547e1971576ea0fd56d5f806311578ee.jpg",
+    "mode": "reference_video",
+    "presetId": "hip_sway",
+    "duration": 15,
+    "createdAt": "2026-11-24T01:06:53.566Z"
+  },
+  {
+    "id": "dance_1795443814428",
+    "jobId": "01a208c5-170e-77c1-8c3e-e208c6073f45",
+    "videoUrl": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795443827/tiktok-video/tiktok_dance/dance_1795443814428.mp4",
+    "localPath": "tiktok-dance/outputs/dance_final_1795443814428.mp4",
+    "storageProvider": "CLOUDINARY",
+    "characterImage": "/api/media/file/https://res.cloudinary.com/dcadn2syh/image/upload/v1795443395/tiktok-video/affiliate_mix/affiliate_1795443390976.png",
+    "mode": "reference_video",
+    "presetId": "hip_sway",
+    "duration": 15,
+    "createdAt": "2026-11-23T14:23:48.721Z"
+  },
+  {
+    "id": "dance_1795267033833",
+    "jobId": "01a1fe3b-a62a-7f52-944e-9fdf844acb7c",
+    "videoUrl": "/api/media/file/tiktok-dance/outputs/dance_final_1795267033833.mp4",
+    "localPath": "tiktok-dance/outputs/dance_final_1795267033833.mp4",
+    "characterImage": "/api/media/file/tiktok-dance/characters/default_model.png",
+    "mode": "reference_video",
+    "presetId": "hip_sway",
+    "duration": 15,
+    "createdAt": "2026-11-21T13:17:19.493Z"
+  }
+]

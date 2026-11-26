@@ -23,7 +23,7 @@ describe("Storage Provider & Path Security", () => {
       "image/png"
     );
 
-    expect(result.localPath).toContain("media/products");
+    expect(result.localPath).toMatch(/^products\//);
     expect(result.fileSize).toBe(fakeImage.length);
 
     const exists = await localStorageProvider.fileExists(result.localPath);

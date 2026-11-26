@@ -46,14 +46,14 @@ export class MacOSSayVoiceProvider implements VoiceProvider {
     // 2. Convert AIFF to standard WAV using FFmpeg if available
     let finalPath = aiffPath;
     try {
-      await execFileAsync("ffmpeg", ["-y", "-i", aiffPath, wavPath]);
+      await execFileAsync(env.FFMPEG_PATH, ["-y", "-i", aiffPath, wavPath]);
       await fs.unlink(aiffPath); // Remove intermediate AIFF
       finalPath = wavPath;
     } catch {
       // If ffmpeg conversion fails, keep aiffPath
     }
 
-    const relativePath = path.relative(process.cwd(), finalPath);
+    const relativePath = path.relative(path.resolve(process.cwd(), env.MEDIA_ROOT), finalPath).split(path.sep).join("/");
     // Rough estimate of duration: ~150 words per minute if not probed
     const words = text.trim().split(/\s+/).length;
     const durationSec = Math.max(1.0, Math.round((words / 2.5) * 10) / 10);

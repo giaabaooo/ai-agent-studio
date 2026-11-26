@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/toast";
 import {
   Users,
   Copy,
@@ -44,6 +45,7 @@ export default function CreatorsPage() {
   const [activeTab, setActiveTab] = useState<"LINH" | "NAM">("LINH");
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     fetchCreators();
@@ -68,6 +70,7 @@ export default function CreatorsPage() {
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedPrompt(label);
+    toast.success(`Đã copy ${label} vào clipboard!`);
     setTimeout(() => setCopiedPrompt(null), 2000);
   };
 
@@ -99,8 +102,9 @@ export default function CreatorsPage() {
       });
 
       await fetchCreators();
+      toast.success("Upload ảnh chân dung thành công!");
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Upload thất bại");
+      toast.error(err instanceof Error ? err.message : "Upload thất bại");
     } finally {
       setUploading(false);
     }

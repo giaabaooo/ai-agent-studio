@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import {
   Users,
-  Eye,
+  Film,
   TrendingUp,
   Sparkles,
   ArrowRight,
@@ -11,13 +11,17 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const account = await prisma.tikTokAccount.findFirst({
+    where: { isActive: true },
     include: {
+      oauthTokens: true,
       snapshots: {
         orderBy: { capturedAt: "desc" },
         take: 1,
@@ -25,11 +29,15 @@ export default async function DashboardPage() {
     },
   });
 
+  const isConnected = Boolean(account && account.oauthTokens);
+  const isExpired = isConnected && account?.oauthTokens?.expiresAt ? account.oauthTokens.expiresAt < new Date() : false;
+
   const latestSnapshot = account?.snapshots[0] || {
     followerCount: 0,
-    followingCount: 5,
+    followingCount: 0,
     likesCount: 0,
     videoCount: 0,
+    capturedAt: null,
   };
 
   const productCount = await prisma.product.count();
@@ -53,13 +61,35 @@ export default async function DashboardPage() {
       {/* Top Banner */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-indigo-500/10 to-transparent border border-primary/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-              Lộ trình Giai đoạn 1 &bull; NEW
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">
+              Lộ trình Giai đoạn 1 &bull; {account?.stage || "NEW"}
             </span>
-            <span className="text-xs text-muted-foreground font-mono">
-              @affiliate_ai_studio
+            <span className="text-xs text-muted-foreground font-mono bg-secondary px-2 py-0.5 rounded">
+              @{account?.username || "chua_ket_noi"}
             </span>
+            {isConnected && !isExpired ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>TikTok Connected</span>
+              </span>
+            ) : isExpired ? (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 hover:underline"
+              >
+                <Clock className="w-3 h-3" />
+                <span>Token hết hạn &bull; Reconnect</span>
+              </Link>
+            ) : (
+              <Link
+                href="/settings"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-muted-foreground bg-secondary px-2 py-0.5 rounded-full border border-border hover:underline"
+              >
+                <AlertTriangle className="w-3 h-3 text-amber-500" />
+                <span>Chưa kết nối TikTok &bull; Kết nối ngay</span>
+              </Link>
+            )}
           </div>
           <h2 className="text-2xl font-bold tracking-tight">
             Chào mừng đến với Affiliate AI Studio
@@ -89,29 +119,46 @@ export default async function DashboardPage() {
 
       {/* Metric Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Followers */}
         <div className="p-5 rounded-xl bg-card border border-border">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
             <span className="text-xs font-medium">Followers Kênh</span>
             <Users className="w-4 h-4 text-primary" />
           </div>
-          <div className="text-2xl font-bold">{latestSnapshot.followerCount.toLocaleString()}</div>
+          <div className="text-2xl font-bold font-mono">
+            {latestSnapshot.followerCount.toLocaleString()}
+          </div>
           <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-emerald-500" />
             <span>Mục tiêu thăng hạng: 300</span>
           </p>
         </div>
 
+        {/* Card 2: Public Videos */}
         <div className="p-5 rounded-xl bg-card border border-border">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
-            <span className="text-xs font-medium">Tổng Lượt Xem (24h)</span>
-            <Eye className="w-4 h-4 text-indigo-400" />
+            <span className="text-xs font-medium">Video trên TikTok</span>
+            <Film className="w-4 h-4 text-indigo-400" />
           </div>
-          <div className="text-2xl font-bold">0</div>
-          <p className="text-[11px] text-muted-foreground mt-1">
-            Đồng bộ từ TikTok Display API
+          <div className="text-2xl font-bold font-mono">
+            {latestSnapshot.videoCount.toLocaleString()}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1">
+            <Clock className="w-3 h-3 text-muted-foreground" />
+            <span>
+              {latestSnapshot.capturedAt
+                ? `Đồng bộ: ${new Date(latestSnapshot.capturedAt).toLocaleTimeString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    day: "2-digit",
+                    month: "2-digit",
+                  })}`
+                : "Chưa đồng bộ Display API"}
+            </span>
           </p>
         </div>
 
+        {/* Card 3: Products */}
         <div className="p-5 rounded-xl bg-card border border-border">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
             <span className="text-xs font-medium">Sản phẩm trong Kho</span>
@@ -125,6 +172,7 @@ export default async function DashboardPage() {
           </p>
         </div>
 
+        {/* Card 4: Creatives */}
         <div className="p-5 rounded-xl bg-card border border-border">
           <div className="flex items-center justify-between text-muted-foreground mb-3">
             <span className="text-xs font-medium">Kịch bản Content Lab</span>

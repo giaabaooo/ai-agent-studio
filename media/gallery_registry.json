@@ -1,0 +1,75 @@
+[
+  {
+    "title": "TikTok Dance Video (hip_sway)",
+    "type": "video",
+    "category": "tiktok_dance",
+    "url": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795482411/tiktok-video/tiktok_dance/dance_1795482393425.mp4",
+    "thumbnailUrl": "/api/media/file/https://res.cloudinary.com/dcadn2syh/image/upload/v1795481973/tiktok-video/uploads/characters/1795452473527_3607547107122021069_3607547107122021069_547e1971576ea0fd56d5f806311578ee.jpg",
+    "storageProvider": "CLOUDINARY",
+    "cloudinaryPublicId": "tiktok-video/tiktok_dance/dance_1795482393425",
+    "duration": 15,
+    "metadata": {
+      "jobId": "01a20b11-0ba8-7ea2-9ac9-3817c3391c58",
+      "mode": "reference_video",
+      "presetId": "hip_sway"
+    },
+    "id": "37c7fe0d-d4a0-412e-b5f7-2b3a5f072f64",
+    "createdAt": "2026-11-24T01:06:53.563Z"
+  },
+  {
+    "title": "TikTok Dance Video (hip_sway)",
+    "type": "video",
+    "category": "tiktok_dance",
+    "url": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795443827/tiktok-video/tiktok_dance/dance_1795443814428.mp4",
+    "thumbnailUrl": "/api/media/file/https://res.cloudinary.com/dcadn2syh/image/upload/v1795443395/tiktok-video/affiliate_mix/affiliate_1795443390976.png",
+    "storageProvider": "CLOUDINARY",
+    "cloudinaryPublicId": "tiktok-video/tiktok_dance/dance_1795443814428",
+    "duration": 15,
+    "metadata": {
+      "jobId": "01a208c5-170e-77c1-8c3e-e208c6073f45",
+      "mode": "reference_video",
+      "presetId": "hip_sway"
+    },
+    "id": "21ce670d-f141-4316-9010-50f9841b5ae4",
+    "createdAt": "2026-11-23T14:23:48.720Z"
+  },
+  {
+    "title": "áo dài - Model Nữ Tính Dễ Thương (Coquette / Pastel Soft)",
+    "type": "image",
+    "category": "affiliate_mix",
+    "url": "https://res.cloudinary.com/dcadn2syh/image/upload/v1795443395/tiktok-video/affiliate_mix/affiliate_1795443390976.png",
+    "thumbnailUrl": "https://res.cloudinary.com/dcadn2syh/image/upload/v1795443395/tiktok-video/affiliate_mix/affiliate_1795443390976.png",
+    "storageProvider": "CLOUDINARY",
+    "cloudinaryPublicId": "tiktok-video/affiliate_mix/affiliate_1795443390976",
+    "fileSize": 2408426,
+    "width": 1080,
+    "height": 1920,
+    "metadata": {
+      "productName": "áo dài",
+      "productCategory": "Thời trang Nữ",
+      "stylePreset": "coquette_cute",
+      "styleName": "Nữ Tính Dễ Thương (Coquette / Pastel Soft)",
+      "poseAction": "WEARING",
+      "customPrompt": ""
+    },
+    "id": "12c57d0c-6d6f-445f-9d76-10eeb8e00065",
+    "createdAt": "2026-11-23T14:16:36.671Z"
+  },
+  {
+    "id": "dance_1795267033833",
+    "title": "TikTok Dance Video (hip_sway)",
+    "type": "video",
+    "category": "tiktok_dance",
+    "url": "/api/media/file/tiktok-dance/outputs/dance_final_1795267033833.mp4",
+    "thumbnailUrl": "/api/media/file/tiktok-dance/characters/default_model.png",
+    "storageProvider": "LOCAL",
+    "localPath": "tiktok-dance/outputs/dance_final_1795267033833.mp4",
+    "duration": 15,
+    "createdAt": "2026-11-21T13:17:19.493Z",
+    "metadata": {
+      "presetId": "hip_sway",
+      "mode": "reference_video",
+      "characterImage": "/api/media/file/tiktok-dance/characters/default_model.png"
+    }
+  }
+]

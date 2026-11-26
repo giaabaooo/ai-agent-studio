@@ -17,9 +17,12 @@ const ALLOWED_MIME_TYPES = new Set([
   "audio/wav",
   "audio/x-m4a",
   "audio/mp4",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
 ]);
 
 const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15MB
+const MAX_DOC_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_VIDEO_SIZE = 150 * 1024 * 1024; // 150MB
 
 export class LocalStorageProvider implements StorageProvider {
@@ -59,7 +62,8 @@ export class LocalStorageProvider implements StorageProvider {
     }
 
     const isVideo = mimeType.startsWith("video/");
-    const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    const isDoc = mimeType.includes("wordprocessingml") || mimeType.includes("msword");
+    const maxSize = isVideo ? MAX_VIDEO_SIZE : isDoc ? MAX_DOC_SIZE : MAX_IMAGE_SIZE;
     if (fileBuffer.length > maxSize) {
       throw new Error(
         `Dung lượng tệp vượt quá giới hạn tối đa (${Math.round(maxSize / (1024 * 1024))}MB)`
@@ -73,8 +77,8 @@ export class LocalStorageProvider implements StorageProvider {
     const fullFilePath = path.join(targetDir, cleanName);
     await fs.writeFile(fullFilePath, fileBuffer);
 
-    // Return path relative to project root (e.g. media/products/file.jpg)
-    const relativeToRoot = path.relative(process.cwd(), fullFilePath);
+    // Persist a portable storage key, never an absolute or project-root path.
+    const relativeToRoot = path.relative(this.baseDir, fullFilePath).split(path.sep).join("/");
 
     return {
       localPath: relativeToRoot,
@@ -85,13 +89,13 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async getFileBuffer(localPath: string): Promise<Buffer> {
-    const fullPath = path.resolve(process.cwd(), localPath);
+    const fullPath = this.resolveSafePath(localPath.replace(/^media[\\/]/, ""));
     return await fs.readFile(fullPath);
   }
 
   async deleteFile(localPath: string): Promise<void> {
     try {
-      const fullPath = path.resolve(process.cwd(), localPath);
+      const fullPath = this.resolveSafePath(localPath.replace(/^media[\\/]/, ""));
       await fs.unlink(fullPath);
     } catch {
       // Ignore if already deleted
@@ -100,7 +104,7 @@ export class LocalStorageProvider implements StorageProvider {
 
   async fileExists(localPath: string): Promise<boolean> {
     try {
-      const fullPath = path.resolve(process.cwd(), localPath);
+      const fullPath = this.resolveSafePath(localPath.replace(/^media[\\/]/, ""));
       await fs.access(fullPath);
       return true;
     } catch {

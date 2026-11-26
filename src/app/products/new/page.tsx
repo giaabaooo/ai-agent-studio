@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Package,
   Upload,
@@ -15,35 +15,26 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-export default function NewProductPage() {
+function NewProductForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const productIdParam = searchParams.get("productId");
 
   // Form State
-  const [name, setName] = useState("Máy Hút Bụi Cầm Tay Mini Không Dây Cho Xe Hơi & Bàn Làm Việc");
-  const [category, setCategory] = useState("Automotive / Desk Gadget");
-  const [url, setUrl] = useState("https://tiktok.com/@shop/demo-product");
-  const [price, setPrice] = useState("189000");
-  const [commissionRate, setCommissionRate] = useState("15");
-  const [description, setDescription] = useState(
-    "Máy hút bụi cầm tay sạc pin Type-C, lực hút mạnh 9000Pa, thiết kế nhỏ gọn bằng nắm tay, có 2 đầu hút chuyên dụng cho khe ghế ô tô và bàn phím máy tính."
-  );
-  const [features, setFeatures] = useState<string[]>([
-    "Lực hút mạnh 9000Pa, hút sạch bụi mịn và vụn bánh",
-    "Sạc USB Type-C tiện lợi, pin dùng 30 phút liên tục",
-    "Trọng lượng siêu nhẹ chỉ 350g, cất vừa hộc cửa xe hơi",
-  ]);
-  const [verifiedClaims, setVerifiedClaims] = useState<string[]>([
-    "Lực hút thực tế hút được bụi bám và hạt cát nhỏ",
-    "Bảo hành 6 tháng đổi mới nếu lỗi động cơ",
-  ]);
-  const [sellerInfo, setSellerInfo] = useState("AutoPro Official Store (TikTok Shop Mall)");
+  // Never prefill a real submission form with unrelated demo data: those values
+  // are sent to Gemini and can silently contaminate the product analysis.
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState("");
+  const [url, setUrl] = useState("");
+  const [price, setPrice] = useState("");
+  const [commissionRate, setCommissionRate] = useState("");
+  const [description, setDescription] = useState("");
+  const [features, setFeatures] = useState<string[]>([]);
+  const [verifiedClaims, setVerifiedClaims] = useState<string[]>([]);
+  const [sellerInfo, setSellerInfo] = useState("");
 
   // Uploaded images state (Array of local paths)
-  const [imageUrls, setImageUrls] = useState<string[]>([
-    "media/products/sample_vacuum_1.jpg",
-    "media/products/sample_vacuum_2.jpg",
-    "media/products/sample_vacuum_3.jpg",
-  ]);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Flow State
@@ -52,6 +43,76 @@ export default function NewProductPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [generatingCreatives, setGeneratingCreatives] = useState(false);
   const [error, setError] = useState("");
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  useEffect(() => {
+    if (!productIdParam) return;
+    setLoadingExisting(true);
+    fetch(`/api/products/${productIdParam}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.product) {
+          const p = data.product;
+          setSavedProductId(p.id);
+          setName(p.name || "");
+          setCategory(p.category || "");
+          setUrl(p.url || "");
+          setPrice(p.price ? String(p.price) : "");
+          setCommissionRate(p.commissionRate ? String(p.commissionRate) : "");
+          setDescription(p.description || "");
+          setFeatures(Array.isArray(p.features) ? p.features : []);
+          setVerifiedClaims(Array.isArray(p.verifiedClaims) ? p.verifiedClaims : []);
+          setSellerInfo(p.sellerInfo || "");
+          if (p.images && p.images.length > 0) {
+            setImageUrls(p.images.map((img: any) => img.localPath));
+          }
+          if (p.analyses && p.analyses.length > 0) {
+            setAnalysisResult({
+              analysis: p.analyses[0].analysisData,
+              score: p.score,
+            });
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load existing product", err);
+      })
+      .finally(() => {
+        setLoadingExisting(false);
+      });
+  }, [productIdParam]);
+
+  useEffect(() => {
+    const productId = searchParams.get("productId");
+    if (!productId) return;
+
+    const loadProduct = async () => {
+      try {
+        const response = await fetch(`/api/products/${productId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Không thể tải sản phẩm");
+        const product = data.product;
+        setName(product.name);
+        setCategory(product.category);
+        setUrl(product.url || "");
+        setPrice(product.price ? String(product.price) : "");
+        setCommissionRate(product.commissionRate !== null ? String(product.commissionRate) : "");
+        setDescription(product.description);
+        setFeatures(product.features || []);
+        setVerifiedClaims(product.verifiedClaims || []);
+        setSellerInfo(product.sellerInfo || "");
+        setImageUrls(product.images.map((image: { localPath: string }) => image.localPath));
+        setSavedProductId(product.id);
+        if (product.analyses?.[0] && product.score) {
+          setAnalysisResult({ analysis: product.analyses[0], scores: product.score });
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Không thể tải chi tiết sản phẩm");
+      }
+    };
+
+    loadProduct();
+  }, [searchParams]);
 
   // Handle uploading product image
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -91,8 +152,8 @@ export default function NewProductPage() {
 
   // Step 1: Save Product & Run Analysis
   const handleAnalyze = async () => {
-    if (imageUrls.length < 1) {
-      setError("Vui lòng tải lên tối thiểu 1 ảnh sản phẩm.");
+    if (imageUrls.length < 3) {
+      setError("Vui lòng tải lên tối thiểu 3 ảnh thật của sản phẩm.");
       return;
     }
 
@@ -100,30 +161,40 @@ export default function NewProductPage() {
     setError("");
 
     try {
-      // 1. Create product if not yet saved
+      const productPayload = {
+        name,
+        category,
+        url: url || undefined,
+        price: price ? Number(price) : undefined,
+        commissionRate: commissionRate ? Number(commissionRate) : undefined,
+        description,
+        features,
+        verifiedClaims,
+        sellerInfo,
+        imageUrls,
+      };
+
+      // 1. Create a new product, or persist all edits to an existing product.
       let pId = savedProductId;
       if (!pId) {
         const createRes = await fetch("/api/products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name,
-            category,
-            url: url || undefined,
-            price: price ? Number(price) : undefined,
-            commissionRate: commissionRate ? Number(commissionRate) : undefined,
-            description,
-            features,
-            verifiedClaims,
-            sellerInfo,
-            imageUrls,
-          }),
+          body: JSON.stringify(productPayload),
         });
 
         const createData = await createRes.json();
         if (!createRes.ok) throw new Error(createData.error);
         pId = createData.product.id;
         setSavedProductId(pId);
+      } else {
+        const updateRes = await fetch(`/api/products/${pId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productPayload),
+        });
+        const updateData = await updateRes.json();
+        if (!updateRes.ok) throw new Error(updateData.error);
       }
 
       // 2. Call Gemini Product Analyst
@@ -200,6 +271,45 @@ export default function NewProductPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="w-full px-3.5 py-2 text-sm bg-secondary/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-foreground mb-1">
+              Tính năng nổi bật
+            </label>
+            <textarea
+              rows={4}
+              value={features.join("\n")}
+              onChange={(e) => setFeatures(e.target.value.split("\n").map((value) => value.trim()).filter(Boolean))}
+              placeholder="Mỗi dòng một tính năng, ví dụ: Vải cotton co giãn 4 chiều"
+              className="w-full px-3.5 py-2 text-sm bg-secondary/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 leading-relaxed"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-foreground mb-1">
+              Claim đã xác thực
+            </label>
+            <textarea
+              rows={4}
+              value={verifiedClaims.join("\n")}
+              onChange={(e) => setVerifiedClaims(e.target.value.split("\n").map((value) => value.trim()).filter(Boolean))}
+              placeholder="Mỗi dòng một claim có thể chứng minh; không điền nếu chưa có"
+              className="w-full px-3.5 py-2 text-sm bg-secondary/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 leading-relaxed"
+            />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-xs font-bold text-foreground mb-1">
+              Thông tin shop / nguồn (tuỳ chọn)
+            </label>
+            <input
+              type="text"
+              value={sellerInfo}
+              onChange={(e) => setSellerInfo(e.target.value)}
+              placeholder="Ví dụ: DAZZI Official Store"
               className="w-full px-3.5 py-2 text-sm bg-secondary/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           </div>
@@ -445,5 +555,19 @@ export default function NewProductPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function NewProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-5xl mx-auto py-16 text-center text-xs text-muted-foreground">
+          Đang tải thông tin sản phẩm...
+        </div>
+      }
+    >
+      <NewProductForm />
+    </Suspense>
   );
 }

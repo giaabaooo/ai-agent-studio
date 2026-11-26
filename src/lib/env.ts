@@ -17,16 +17,25 @@ const envSchema = z.object({
   TIKTOK_CLIENT_KEY: z.string().optional().default(""),
   TIKTOK_CLIENT_SECRET: z.string().optional().default(""),
   TIKTOK_REDIRECT_URI: z.string().optional().default("http://localhost:3000/api/tiktok/callback"),
+  TIKTOK_DRAFT_UPLOAD_ENABLED: z.string().transform((val) => val === "true").default("false"),
   MEDIA_ROOT: z.string().default("./media"),
   MACHINE_LABEL: z.string().default("MAC_OFFICE"),
-  FFMPEG_PATH: z.string().default("/Users/na/.local/bin/ffmpeg"),
-  VOICE_PROVIDER: z.enum(["MACOS_SAY", "EDGE_TTS"]).default("MACOS_SAY"),
+  // Resolve `ffmpeg` through PATH by default. A workstation can override this
+  // locally without committing an OS-specific path.
+  FFMPEG_PATH: z.string().min(1).default("ffmpeg"),
+  VOICE_PROVIDER: z.enum(["MACOS_SAY", "EXTERNAL"]).default("MACOS_SAY"),
+  FAL_KEY: z.string().optional().default(""),
+  CLOUDINARY_CLOUD_NAME: z.string().optional().default(""),
+  CLOUDINARY_API_KEY: z.string().optional().default(""),
+  CLOUDINARY_API_SECRET: z.string().optional().default(""),
+  CLOUDINARY_URL: z.string().optional().default(""),
+  CLOUDINARY_DEFAULT_FOLDER: z.string().optional().default("tiktok-video"),
 });
 
 export const env = envSchema.parse({
   DATABASE_URL:
     process.env.DATABASE_URL ||
-    "postgresql://postgres@localhost:5433/affiliate_ai_studio",
+    "postgresql://postgres@127.0.0.1:5433/affiliate_ai_studio",
   APP_MODE: process.env.APP_MODE || "local",
   FREE_ONLY: process.env.FREE_ONLY || "true",
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || "",
@@ -40,8 +49,15 @@ export const env = envSchema.parse({
   TIKTOK_CLIENT_KEY: process.env.TIKTOK_CLIENT_KEY || "",
   TIKTOK_CLIENT_SECRET: process.env.TIKTOK_CLIENT_SECRET || "",
   TIKTOK_REDIRECT_URI: process.env.TIKTOK_REDIRECT_URI,
+  TIKTOK_DRAFT_UPLOAD_ENABLED: process.env.TIKTOK_DRAFT_UPLOAD_ENABLED || "false",
   MEDIA_ROOT: process.env.MEDIA_ROOT || "./media",
   MACHINE_LABEL: process.env.MACHINE_LABEL || "MAC_OFFICE",
-  FFMPEG_PATH: process.env.FFMPEG_PATH || "/Users/na/.local/bin/ffmpeg",
+  FFMPEG_PATH: process.env.FFMPEG_PATH || "ffmpeg",
   VOICE_PROVIDER: process.env.VOICE_PROVIDER || "MACOS_SAY",
+  FAL_KEY: process.env.FAL_KEY || "",
+  CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || "dcadn2syh",
+  CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || "178359369335534",
+  CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || "FwsPdInccg7HPp6iLNn9ewxDJe4",
+  CLOUDINARY_URL: process.env.CLOUDINARY_URL || "",
+  CLOUDINARY_DEFAULT_FOLDER: process.env.CLOUDINARY_DEFAULT_FOLDER || "tiktok-video",
 });

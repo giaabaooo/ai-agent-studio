@@ -26,3 +26,36 @@
 1. **Không Scraper:** Tuyệt đối không cào dữ liệu qua private API hoặc web cookies không chính thức để tránh bị khóa tài khoản hoặc ban IP.
 2. **Mã hóa Token:** Mọi `access_token` và `refresh_token` đều được mã hóa bằng thuật toán chuẩn `AES-256-GCM` với khóa bí mật `TOKEN_ENCRYPTION_KEY` lưu trong biến môi trường server-only.
 3. **Approval Gate:** Không có tính năng tự động xuất bản (Full-Auto) trong V1. Chủ tài khoản luôn là người kiểm duyệt nội dung cuối cùng.
+
+---
+
+## 3. Trạng Thái Triển Khai Thực Tế (Phase 3 Implemented)
+
+Hệ thống đã triển khai đầy đủ kiến trúc kết nối và chuẩn bị xuất bản TikTok:
+
+1. **OAuth 2.0 PKCE & Session Store:**
+   - Hoàn thành theo chuẩn RFC 7636 với thuật toán challenge `S256`.
+   - `code_verifier` (64 ký tự base64url) và `state` chống CSRF được lưu ngắn hạn trên PostgreSQL server-side (`TikTokOAuthSession`) với thời hạn 10 phút, tự động dọn dẹp phiên hết hạn.
+   - Endpoint khởi tạo: `GET /api/tiktok/auth?redirect=true`
+   - Endpoint callback: `GET /api/tiktok/callback`
+
+2. **Mã hóa Token AES-256-GCM:**
+   - Mọi `access_token` và `refresh_token` đều được mã hóa bằng thuật toán `aes-256-gcm` với khóa bí mật `TOKEN_ENCRYPTION_KEY`.
+   - Không in hoặc trả về plain token qua bất kỳ API response hay client log nào.
+   - Tự động kiểm tra thời hạn và làm mới token (Refresh Token) khi còn dưới 5 phút.
+
+3. **Display API & Deterministic Metrics:**
+   - Đồng bộ hồ sơ người dùng (`GET /v2/user/info/`) và lưu snapshot `TikTokAccountSnapshot`.
+   - Lấy danh sách video công khai (`POST /v2/video/list/`) và đối chiếu với `Publication`.
+   - Tính toán các chỉ số `likeRate`, `commentRate`, `shareRate`, `engagementRate`, `viewVelocity` hoàn toàn bằng TypeScript toán học xác định, không dùng LLM để tính toán tỷ lệ.
+   - Endpoint đồng bộ: `POST /api/tiktok/sync`
+   - Nút `SYNC NOW` trên TopNav và Settings: Tự động điều hướng đến Settings nếu chưa kết nối OAuth.
+
+4. **TikTok Inbox Draft Upload (Gated Feature Flag):**
+   - Triển khai endpoint `POST /api/tiktok/draft/upload`.
+   - Được bảo vệ bởi feature flag: `TIKTOK_DRAFT_UPLOAD_ENABLED=false` (mặc định tắt an toàn).
+   - Kiểm tra điều kiện ngặt nghèo: Chỉ cho phép upload khi video đã ở trạng thái `FINAL_RENDERED` (1080×1920) và gắn cờ `is_aigc: true`.
+   - Video đẩy vào mục TikTok Inbox (hộp thư hệ thống của creator), KHÔNG sử dụng Direct Post.
+
+5. **Quy tắc Gắn Giỏ hàng Affiliate (Bắt buộc Thủ công):**
+   - Giao diện Creative Studio hiển thị Checklist kiểm duyệt 5 bước rõ ràng kèm nút copy Caption, thông tin sản phẩm và SKU/URL để người dùng tự chọn giỏ hàng khi duyệt đăng trên app TikTok.

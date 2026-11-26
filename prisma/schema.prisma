@@ -99,6 +99,18 @@ model TikTokOAuthToken {
   @@map("tiktok_oauth_tokens")
 }
 
+model TikTokOAuthSession {
+  id           String   @id @default(uuid())
+  state        String   @unique
+  codeVerifier String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([state])
+  @@map("tiktok_oauth_sessions")
+}
+
+
 model TikTokAccountSnapshot {
   id             String        @id @default(uuid())
   accountId      String
@@ -461,21 +473,25 @@ enum AssetType {
   THUMBNAIL
   RAW_VIDEO
   VOICE_AUDIO
+  SUBTITLE_SRT
   FINAL_VIDEO
 }
 
 model Asset {
-  id         String         @id @default(uuid())
-  creativeId String
-  creative   Creative       @relation(fields: [creativeId], references: [id], onDelete: Cascade)
-  type       AssetType
-  localPath  String
-  mimeType   String
-  fileSize   Int
-  metadata   Json? // Resolution, duration, bitrate
-  version    Int            @default(1)
-  createdAt  DateTime       @default(now())
-  versions   AssetVersion[]
+  id              String         @id @default(uuid())
+  creativeId      String
+  creative        Creative       @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  type            AssetType
+  localPath       String
+  // `localPath` is a relative storage key only; never an absolute machine path.
+  storageProvider String         @default("LOCAL")
+  machineLabel    String         @default("UNKNOWN")
+  mimeType        String
+  fileSize        Int
+  metadata        Json? // Resolution, duration, bitrate
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  versions        AssetVersion[]
 
   @@index([creativeId, type])
   @@map("assets")
@@ -568,6 +584,7 @@ model Publication {
   creative       Creative      @relation(fields: [creativeId], references: [id], onDelete: Cascade)
   tikTokVideoId  String?       @unique
   tikTokShareUrl String?
+  publishId      String?
   postedAt       DateTime      @default(now())
 
   dna                PublicationCreativeDNA?
@@ -745,4 +762,246 @@ model StrategyDecision {
   createdAt     DateTime     @default(now())
 
   @@map("strategy_decisions")
+}
+
+// ==========================================
+// 11. ANIMATION STUDIO (XÓM MÍT NA)
+// ==========================================
+
+enum SeriesStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum EpisodeParseStatus {
+  PARSED
+  NEEDS_REVIEW
+  ERROR
+}
+
+enum EpisodeStatus {
+  DRAFT
+  STORYBOARD_READY
+  ASSETS_PENDING
+  VOICE_READY
+  RENDERED
+  PUBLISHED
+}
+
+enum CharacterStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum CharacterReferenceType {
+  FULL_BODY_FRONT
+  FULL_BODY_THREE_QUARTER
+  FULL_BODY_BACK
+  EXPRESSION
+  BASIC_POSE
+  GROUP_HEIGHT_SHEET
+}
+
+enum SceneStatus {
+  DRAFT
+  PROMPT_READY
+  ASSETS_PENDING
+  APPROVED
+}
+
+enum AnimationAssetType {
+  KEYFRAME
+  RAW_VIDEO
+  VOICE
+  SFX
+  MUSIC
+}
+
+enum RenderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ScriptImportStatus {
+  DRAFT
+  CONFIRMED
+  DISCARDED
+}
+
+model AnimationSeries {
+  id            String               @id @default(uuid())
+  title         String
+  slug          String               @unique
+  sourceDocPath String?
+  sourceDocHash String?
+  status        SeriesStatus         @default(DRAFT)
+  styleGuide    Json?
+  safetyRules   Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  seasons       AnimationSeason[]
+  characters    AnimationCharacter[]
+  importDrafts  ScriptImportDraft[]
+
+  @@map("animation_series")
+}
+
+model AnimationSeason {
+  id        String             @id @default(uuid())
+  seriesId  String
+  series    AnimationSeries    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  number    Int
+  title     String
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  episodes  AnimationEpisode[]
+
+  @@unique([seriesId, number])
+  @@map("animation_seasons")
+}
+
+model AnimationEpisode {
+  id                String             @id @default(uuid())
+  seasonId          String
+  season            AnimationSeason    @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  number            Int
+  title             String
+  logline           String?
+  summary           String?            @db.Text
+  targetDurationSec Int                @default(50)
+  sourceContent     String?            @db.Text
+  parseStatus       EpisodeParseStatus @default(PARSED)
+  status            EpisodeStatus      @default(DRAFT)
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  scenes            EpisodeScene[]
+  renders           EpisodeRender[]
+
+  @@unique([seasonId, number])
+  @@map("animation_episodes")
+}
+
+model AnimationCharacter {
+  id              String                     @id @default(uuid())
+  seriesId        String
+  series          AnimationSeries            @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  name            String
+  role            String
+  ageDescription  String?
+  appearanceLock  String                     @db.Text
+  outfitLock      String                     @db.Text
+  personality     String?                    @db.Text
+  voiceRule       String                     @db.Text
+  colorPalette    Json?
+  masterPrompt    String                     @db.Text
+  negativePrompt  String                     @db.Text
+  safetyRules     String?                    @db.Text
+  status          CharacterStatus            @default(DRAFT)
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+  referenceAssets CharacterReferenceAsset[]
+
+  @@unique([seriesId, name])
+  @@map("animation_characters")
+}
+
+model CharacterReferenceAsset {
+  id            String                 @id @default(uuid())
+  characterId   String
+  character     AnimationCharacter     @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  referenceType CharacterReferenceType
+  localPath     String
+  mimeType      String
+  approved      Boolean                @default(false)
+  version       Int                    @default(1)
+  metadata      Json?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([characterId, referenceType])
+  @@map("character_reference_assets")
+}
+
+model EpisodeScene {
+  id               String           @id @default(uuid())
+  episodeId        String
+  episode          AnimationEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  orderIndex       Int
+  startSec         Float
+  endSec           Float
+  durationSec      Float
+  setting          String           @default("Ngôi nhà Nắng")
+  action           String           @db.Text
+  dialogue         String?          @db.Text
+  emotionDirection String?          @db.Text
+  soundDirection   String?          @db.Text
+  visualPrompt     String           @db.Text
+  negativePrompt   String           @db.Text
+  continuityNotes  String?          @db.Text
+  status           SceneStatus      @default(DRAFT)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  assets           SceneAsset[]
+
+  @@unique([episodeId, orderIndex])
+  @@map("episode_scenes")
+}
+
+model SceneAsset {
+  id        String             @id @default(uuid())
+  sceneId   String
+  scene     EpisodeScene       @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  assetType AnimationAssetType
+  localPath String
+  version   Int                @default(1)
+  approved  Boolean            @default(false)
+  mimeType  String
+  fileSize  Int
+  metadata  Json?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([sceneId, assetType])
+  @@map("scene_assets")
+}
+
+model EpisodeRender {
+  id            String           @id @default(uuid())
+  episodeId     String
+  episode       AnimationEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  localPath     String
+  version       Int              @default(1)
+  active        Boolean          @default(true)
+  status        RenderStatus     @default(PENDING)
+  renderOptions Json?
+  metadata      Json?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([episodeId, version])
+  @@map("episode_renders")
+}
+
+model ScriptImportDraft {
+  id            String             @id @default(uuid())
+  seriesId      String?
+  series        AnimationSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  sourcePath    String
+  sourceDocHash String?
+  parsedJson    Json
+  warnings      Json?
+  status        ScriptImportStatus @default(DRAFT)
+  expiresAt     DateTime
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@map("script_import_drafts")
 }

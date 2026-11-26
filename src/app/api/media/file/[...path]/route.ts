@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
+import { Readable } from "stream";
 import path from "path";
 import { env } from "@/lib/env";
 
@@ -9,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { path: segments } = await params;
-    const relativePath = segments.join("/");
+    const relativePath = segments.join("/").replace(/^media\//, "");
     const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "");
     const baseDir = path.resolve(process.cwd(), env.MEDIA_ROOT);
     const fullPath = path.resolve(baseDir, normalized);
@@ -37,6 +38,7 @@ export async function GET(
       ".wav": "audio/wav",
       ".mp3": "audio/mpeg",
       ".aiff": "audio/aiff",
+      ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     };
     const contentType = mimeTypes[ext] || "application/octet-stream";
 
@@ -48,13 +50,7 @@ export async function GET(
       const chunkSize = end - start + 1;
 
       const fileStream = fs.createReadStream(fullPath, { start, end });
-      const webStream = new ReadableStream({
-        start(controller) {
-          fileStream.on("data", (chunk) => controller.enqueue(chunk));
-          fileStream.on("end", () => controller.close());
-          fileStream.on("error", (err) => controller.error(err));
-        },
-      });
+      const webStream = Readable.toWeb(fileStream) as ReadableStream<Uint8Array>;
 
       return new NextResponse(webStream, {
         status: 206,
@@ -68,13 +64,7 @@ export async function GET(
     }
 
     const fileStream = fs.createReadStream(fullPath);
-    const webStream = new ReadableStream({
-      start(controller) {
-        fileStream.on("data", (chunk) => controller.enqueue(chunk));
-        fileStream.on("end", () => controller.close());
-        fileStream.on("error", (err) => controller.error(err));
-      },
-    });
+    const webStream = Readable.toWeb(fileStream) as ReadableStream<Uint8Array>;
 
     return new NextResponse(webStream, {
       headers: {

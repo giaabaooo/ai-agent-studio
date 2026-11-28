@@ -1,5 +1,17 @@
 [
   {
+    "id": "dance_1795837222010",
+    "jobId": "01a22035-9189-7401-8ddb-dd0e50334380",
+    "videoUrl": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795837230/tiktok-video/tiktok_dance/dance_1795837222010.mp4",
+    "localPath": "tiktok-dance/outputs/dance_raw_1795837222010.mp4",
+    "storageProvider": "CLOUDINARY",
+    "characterImage": "/api/media/file/tiktok-dance/characters/default_model.png",
+    "mode": "reference_video",
+    "presetId": "boutique_spin",
+    "duration": "auto",
+    "createdAt": "2026-11-28T03:40:31.483Z"
+  },
+  {
     "id": "dance_1795482393425",
     "jobId": "01a20b11-0ba8-7ea2-9ac9-3817c3391c58",
     "videoUrl": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795482411/tiktok-video/tiktok_dance/dance_1795482393425.mp4",

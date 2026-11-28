@@ -1,5 +1,22 @@
 [
   {
+    "title": "TikTok Dance Video (boutique_spin)",
+    "type": "video",
+    "category": "tiktok_dance",
+    "url": "https://res.cloudinary.com/dcadn2syh/video/upload/v1795837230/tiktok-video/tiktok_dance/dance_1795837222010.mp4",
+    "thumbnailUrl": "/api/media/file/tiktok-dance/characters/default_model.png",
+    "storageProvider": "CLOUDINARY",
+    "cloudinaryPublicId": "tiktok-video/tiktok_dance/dance_1795837222010",
+    "duration": 10,
+    "metadata": {
+      "jobId": "01a22035-9189-7401-8ddb-dd0e50334380",
+      "mode": "reference_video",
+      "presetId": "boutique_spin"
+    },
+    "id": "4a958d6d-e03a-4853-966f-c8f37ad47307",
+    "createdAt": "2026-11-28T03:40:31.480Z"
+  },
+  {
     "title": "TikTok Dance Video (hip_sway)",
     "type": "video",
     "category": "tiktok_dance",

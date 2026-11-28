@@ -47,3 +47,7 @@ media/finals/*
 !media/finals/.gitkeep
 media/thumbnails/*
 !media/thumbnails/.gitkeep
+media/tiktok-dance/jobs/
+media/tiktok-dance/references/
+media/tiktok-dance/outputs/
+media/tiktok-dance/audio/

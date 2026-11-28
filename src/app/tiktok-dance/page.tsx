@@ -113,6 +113,7 @@ export default function TikTokDanceStudioPage() {
 
   // Execution States
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [currentVideo, setCurrentVideo] = useState<GeneratedVideo | null>(null);
   const [history, setHistory] = useState<GeneratedVideo[]>([]);
   const [fullscreenVideoUrl, setFullscreenVideoUrl] = useState<string | null>(null);
@@ -388,6 +389,39 @@ export default function TikTokDanceStudioPage() {
     } finally {
       setIsGenerating(false);
       setActiveJob(null);
+    }
+  };
+
+  // Download video handler (supports cross-origin Cloudinary URLs via Blob download)
+  const handleDownloadVideo = async (video: GeneratedVideo) => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    const filename = `tiktok_dance_${video.id}.mp4`;
+
+    try {
+      const res = await fetch(video.videoUrl);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      success("Đang lưu video MP4 về máy...");
+    } catch {
+      const cloudinaryDownloadUrl = video.videoUrl.includes("res.cloudinary.com") &&
+        video.videoUrl.includes("/upload/")
+        ? video.videoUrl.replace("/upload/", `/upload/fl_attachment:${filename.replace(/\.mp4$/, "")}/`)
+        : video.videoUrl;
+      window.open(cloudinaryDownloadUrl, "_blank", "noopener,noreferrer");
+      info("Đã mở link tải video ở tab mới.");
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -942,14 +976,24 @@ export default function TikTokDanceStudioPage() {
                 </div>
 
                 <div className="pt-2 flex items-center gap-2">
-                  <a
-                    href={currentVideo.videoUrl}
-                    download={`tiktok_dance_${currentVideo.id}.mp4`}
-                    className="flex-1 py-2.5 px-4 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 text-center"
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadVideo(currentVideo)}
+                    disabled={isDownloading}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 text-center disabled:opacity-60"
                   >
-                    <Download className="w-4 h-4" />
-                    <span>Tải Video MP4 Về Máy</span>
-                  </a>
+                    {isDownloading ? (
+                      <>
+                        <RotateCw className="w-4 h-4 animate-spin" />
+                        <span>Đang Tải Video...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        <span>Tải Video MP4 Về Máy</span>
+                      </>
+                    )}
+                  </button>
                   <button
                     onClick={() => handleDeleteVideo(currentVideo.id)}
                     className="p-2.5 rounded-xl bg-secondary hover:bg-rose-500/20 text-muted-foreground hover:text-rose-400 border border-border transition-colors"
